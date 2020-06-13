@@ -12,8 +12,8 @@ type Producer struct {
 	exitC chan struct{}
 }
 
-func NewProducer() (*Producer, error) {
-	producer, err := sarama.NewAsyncProducer([]string{"127.0.0.1:9092"}, sarama.NewConfig())
+func NewProducer(broker string) (*Producer, error) {
+	producer, err := sarama.NewAsyncProducer([]string{broker}, sarama.NewConfig())
 	if err != nil {
 		return nil, err
 	}
