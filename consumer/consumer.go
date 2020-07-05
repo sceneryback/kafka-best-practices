@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Shopify/sarama"
-	"github.com/sceneryback/kafka-best-practices/producer"
 	"sync/atomic"
 	"time"
+
+	"github.com/Shopify/sarama"
+
+	"github.com/sceneryback/kafka-best-practices/producer"
 )
 
 type ConsumerGroupHandler interface {
@@ -24,6 +26,7 @@ func NewConsumerGroup(broker string, topics []string, group string, handler Cons
 	ctx := context.Background()
 	cfg := sarama.NewConfig()
 	cfg.Version = sarama.V0_10_2_0
+	cfg.Consumer.Offsets.Initial = sarama.OffsetOldest
 	client, err := sarama.NewConsumerGroup([]string{broker}, group, cfg)
 	if err != nil {
 		panic(err)
@@ -62,7 +65,7 @@ type ConsumerSessionMessage struct {
 	Message *sarama.ConsumerMessage
 }
 
-func getMessage(data []byte) error {
+func decodeMessage(data []byte) error {
 	var msg producer.Message
 	err := json.Unmarshal(data, &msg)
 	if err != nil {
@@ -75,7 +78,7 @@ func StartSyncConsumer(broker, topic string) (*ConsumerGroup, error) {
 	var count int64
 	var start = time.Now()
 	handler := NewSyncConsumerGroupHandler(func(data []byte) error {
-		if err := getMessage(data); err != nil {
+		if err := decodeMessage(data); err != nil {
 			return err
 		}
 		count++
@@ -98,7 +101,7 @@ func StartBatchConsumer(broker, topic string) (*ConsumerGroup, error) {
 		MaxBufSize: 1000,
 		Callback: func(messages []*ConsumerSessionMessage) error {
 			for i := range messages {
-				if err := getMessage(messages[i].Message.Value); err == nil {
+				if err := decodeMessage(messages[i].Message.Value); err == nil {
 					messages[i].Session.MarkMessage(messages[i].Message, "")
 				}
 			}
@@ -123,7 +126,7 @@ func StartMultiAsyncConsumer(broker, topic string) (*ConsumerGroup, error) {
 	for i := 0; i < 8; i++ {
 		go func() {
 			for message := range bufChan {
-				if err := getMessage(message.Message.Value); err == nil {
+				if err := decodeMessage(message.Message.Value); err == nil {
 					message.Session.MarkMessage(message.Message, "")
 				}
 				cur := atomic.AddInt64(&count, 1)
@@ -151,7 +154,7 @@ func StartMultiBatchConsumer(broker, topic string) (*ConsumerGroup, error) {
 		go func() {
 			for messages := range bufChan {
 				for j := range messages {
-					if err := getMessage(messages[j].Message.Value); err == nil {
+					if err := decodeMessage(messages[j].Message.Value); err == nil {
 						messages[j].Session.MarkMessage(messages[j].Message, "")
 					}
 				}

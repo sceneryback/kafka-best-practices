@@ -24,8 +24,10 @@ type batchConsumerGroupHandler struct {
 	ticker    *time.Ticker
 	msgBuf []*ConsumerSessionMessage
 
+	// lock to protect buffer operation
 	mu sync.RWMutex
 
+	// callback
 	cb func([]*ConsumerSessionMessage) error
 }
 
@@ -84,6 +86,8 @@ func (h *batchConsumerGroupHandler) flushBuffer() {
 }
 
 func (h *batchConsumerGroupHandler) insertMessage(msg *ConsumerSessionMessage) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.msgBuf = append(h.msgBuf, msg)
 	if len(h.msgBuf) >= h.cfg.MaxBufSize {
 		h.flushBuffer()

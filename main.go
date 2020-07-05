@@ -40,6 +40,9 @@ func main()  {
 
 	var topic = "test-practice-topic"
 
+	var done = make(chan struct{})
+	defer close(done)
+
 	switch mode {
 	case ProduceMode:
 		producer, err := producer.NewProducer(broker)
@@ -47,7 +50,7 @@ func main()  {
 			panic(err)
 		}
 		defer producer.Close()
-		go producer.StartProduce(topic)
+		go producer.StartProduce(done, topic)
 	case SyncMode:
 		// 1. sync consumer
 		consumer, err := consumer.StartSyncConsumer(broker, topic)
@@ -81,7 +84,6 @@ func main()  {
 		return
 	}
 
-	//time.Sleep(30*time.Second)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	fmt.Println("received signal", <-c)

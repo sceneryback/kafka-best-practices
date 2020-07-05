@@ -4,5 +4,6 @@ go 1.13
 
 require (
 	github.com/Shopify/sarama v1.26.4
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/tools v0.0.0-20200522201501-cb1345f3a375 // indirect
 )

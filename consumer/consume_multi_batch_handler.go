@@ -1,9 +1,10 @@
 package consumer
 
 import (
-	"github.com/Shopify/sarama"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
 )
 
 // ----- batch handler
@@ -27,6 +28,7 @@ type multiBatchConsumerGroupHandler struct {
 	ticker    *time.Ticker
 	msgBuf batchMessages
 
+	// lock to protect buffer operation
 	mu sync.RWMutex
 }
 
@@ -78,10 +80,13 @@ func (h *multiBatchConsumerGroupHandler) Reset() {
 func (h *multiBatchConsumerGroupHandler) flushBuffer() {
 	if len(h.msgBuf) > 0 {
 		h.cfg.BufChan <- h.msgBuf
+		h.msgBuf = make([]*ConsumerSessionMessage, 0, h.cfg.BufferCapacity)
 	}
 }
 
 func (h *multiBatchConsumerGroupHandler) insertMessage(msg *ConsumerSessionMessage) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.msgBuf = append(h.msgBuf, msg)
 	if len(h.msgBuf) >= h.cfg.MaxBufSize {
 		h.flushBuffer()

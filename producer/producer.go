@@ -3,13 +3,13 @@ package producer
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Shopify/sarama"
 	"time"
+
+	"github.com/Shopify/sarama"
 )
 
 type Producer struct {
 	p     sarama.AsyncProducer
-	exitC chan struct{}
 }
 
 func NewProducer(broker string) (*Producer, error) {
@@ -19,7 +19,6 @@ func NewProducer(broker string) (*Producer, error) {
 	}
 	return &Producer{
 		p:     producer,
-		exitC: make(chan struct{}),
 	}, nil
 }
 
@@ -27,7 +26,7 @@ type Message struct {
 	Id int `json:"id"`
 }
 
-func (p *Producer) StartProduce(topic string) {
+func (p *Producer) StartProduce(done chan struct{}, topic string) {
 	start := time.Now()
 	for i := 0; ; i++ {
 		msg := Message{i}
@@ -36,6 +35,8 @@ func (p *Producer) StartProduce(topic string) {
 			continue
 		}
 		select {
+		case <-done:
+			return
 		case p.p.Input() <- &sarama.ProducerMessage{
 			Topic: topic,
 			Value: sarama.ByteEncoder(msgBytes),
@@ -45,16 +46,11 @@ func (p *Producer) StartProduce(topic string) {
 			}
 		case err := <-p.p.Errors():
 			fmt.Printf("Failed to send message to kafka, err: %s, msg: %s\n", err, msgBytes)
-		case <-p.exitC:
-			return
 		}
 	}
 }
 
 func (p *Producer) Close() error {
-	defer func() {
-		p.exitC <- struct{}{}
-	}()
 	if p != nil {
 		return p.p.Close()
 	}
